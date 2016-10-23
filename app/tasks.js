@@ -175,6 +175,7 @@ function makeAttachments(postIds, cb) {
             let rowsDone = 0;
             rows.forEach(row => {
               if (!row.FILE_NAME) {
+                console.log('No  file name, skipping.');
                 return done();
               }
               fs.readFile(attachmentsHost + row.FILE_NAME, 'base64', function (err,data) {
@@ -223,32 +224,51 @@ function makeUsers(postIds, cb) {
       console.log('Starting users');
       console.log('Dropping old collection');
       dbs.mongo.collection('users').drop();
-      dbs.mysql.query(
-        `
-        SELECT * FROM ${prefix}USERS WHERE USER_ID IN(
-          SELECT 
-            DISTINCT(USER_ID) 
-            FROM ${prefix}POSTS
-            WHERE POST_ID IN (${postIds.join(',')})
-         )
-        `,
-        function(err, rows) {
-          if (err) {
-            throw err;
-          }
+      const postIdsLength = postIds.length;
+      let postIdsDone = 0;
+      let usersExported = [];
+      postIds.forEach(postId => {
+        dbs.mysql.query(
+          `
+          SELECT * FROM ${prefix}USERS WHERE USER_ID IN(
+            SELECT 
+              USER_ID 
+              FROM ${prefix}POSTS
+              WHERE POST_ID = ${postId}
+           )
+          `,
+          function(err, rows) {
+            if (err) {
+              throw err;
+            }
+            rows.forEach(row => {
+              let alias = row.USER_DISPLAY_NAME ? row.USER_DISPLAY_NAME : row.USER_LOGIN_NAME;
+              alias = converter.toUtf8(alias);
 
-          rows.forEach(row => {
-            let alias = row.USER_DISPLAY_NAME ? row.USER_DISPLAY_NAME : row.USER_LOGIN_NAME;
-            alias = converter.toUtf8(alias);
-            let user = {
-              uid: row.USER_ID,
-              alias: alias
-            };
-            dbs.mongo.collection('users').insertOne(user);
-          });
-          cb();
-        }
-      )
+              if (usersExported.indexOf(row.USER_ID) > -1) {
+                console.log('User skipped ' + alias);
+                return done();
+              }
+
+              usersExported.push(row.USER_ID);
+              let user = {
+                uid: row.USER_ID,
+                alias: alias
+              };
+              dbs.mongo.collection('users').insertOne(user);
+              console.log('User added ' + alias);
+
+              done();
+              function done() {
+                postIdsDone++;
+                if (postIdsDone === postIdsLength) {
+                  cb();
+                }
+              }
+            });
+          }
+        );
+      });
     })
     .catch(e => {
       throw e;
