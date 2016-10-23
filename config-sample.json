@@ -1,0 +1,14 @@
+{
+  "forumsToExport": [
+    "{number} of forum whcih should be exported (from prefix_FORUMS)"
+  ],
+  "mysql": {
+    "host": "hostname",
+    "dbname": "dbname",
+    "username": "username",
+    "password": "password",
+    "prefix": "prefix for ubb forum (default is probably ubb_)",
+    "realCharset": "e.x. Latin_2 (db maybe is latin1 collated, but strings could have any other larin compatible encoding. This is used for converting. If UTF-8 then no conversion is applied."
+  },
+  "attachmentsPath": "{string} attachments paths on the same server"
+}
