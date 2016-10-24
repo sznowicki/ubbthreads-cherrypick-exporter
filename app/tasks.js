@@ -3,13 +3,16 @@
 const config = require('./helpers/config');
 const forums = config.getSetting('forumsToExport');
 const allDbs = require('./db/all-dbs');
-
 const converter = require('./helpers/converter');
 const prefix = config.getSetting('mysql.prefix');
-
 const fs = require('fs');
 const attachmentsHost = config.getSetting('attachmentsPath');
 
+/**
+ * Reads ubb forums and saves all
+ * important data to mongo.
+ * @param {function} cb
+ */
 function makeForums(cb) {
   const keysToExport = [
     'FORUM_TITLE',
@@ -24,7 +27,6 @@ function makeForums(cb) {
   allDbs.getAllDbs()
     .then(dbs => {
       console.log('Databases ready. Export starts');
-
       console.log('Dropping old collection.');
       dbs.mongo.collection('forums').drop();
 
@@ -32,9 +34,20 @@ function makeForums(cb) {
         dbs.mysql.query(
           `SELECT * FROM ${prefix}FORUMS WHERE FORUM_ID = ${forumId}`,
           function (err, rows) {
+            /**
+             * Current row
+             * @type {Object}
+             */
             let row = rows[0];
+            /**
+             * Forum represantation which will be saved to mongo
+             * @type {Object}
+             */
             let forum = {};
 
+            /**
+             * Object preparation
+             */
             keysToExport.forEach(key => {
               let val = row[key];
               if (keysToUtf.indexOf(key) !== -1) {
@@ -50,7 +63,8 @@ function makeForums(cb) {
               .mongo
               .collection('forums')
               .insertOne(forum);
-            if (forumIteration === forums.length -1) {
+
+            if (forumIteration === forums.length - 1) {
               cb(forums);
             }
           });
@@ -61,9 +75,20 @@ function makeForums(cb) {
     });
 }
 
+/**
+ * Gets all topics from mysql with replies and saves
+ * them to mongo as one document
+ * @param {Array} forums
+ * @param {function} cb
+ */
 function makeForumsTopics(forums, cb) {
   allDbs.getAllDbs()
     .then(dbs => {
+      /**
+       * All postIds which were exported.
+       * Will be passed to callback
+       * @type {Array}
+       */
       let exportedPostIds = [];
       console.log('Topics export starts');
       console.log('Dropping old collection.');
@@ -71,8 +96,10 @@ function makeForumsTopics(forums, cb) {
 
       const forumsLength = forums.length;
       let forumsDone = 0;
+      /*
+       * This is fast, no need for memory menagement, can go async.
+       */
       forums.forEach(forumId => {
-        console.log(forumId);
         dbs.mysql.query(
           `
           SELECT POST_ID
@@ -104,6 +131,7 @@ function makeForumsTopics(forums, cb) {
                   };
                   posts.forEach(post => {
                     exportedPostIds.push(post.POST_ID);
+                    // post it topic
                     if (!post.POST_PARENT_ID) {
                       topic.postId = post.POST_ID;
                       topic.uid = post.USER_ID;
@@ -112,6 +140,7 @@ function makeForumsTopics(forums, cb) {
                       topic.body = converter.toUtf8(post.POST_BODY);
                       return;
                     }
+                    // post is reply
                     let sanePost = {
                       postId: post.POST_ID,
                       uid: post.USER_ID,
@@ -121,15 +150,18 @@ function makeForumsTopics(forums, cb) {
                     };
                     topic.replies.push(sanePost);
                   });
+
                   console.log('Inserting topic for forum: ' + forumId);
                   console.log('Topic subject: ' + topic.subject);
                   console.log('Topic postID: ' + topic.postId);
 
                   dbs.mongo.collection('topics').insertOne(topic);
                   rowsDone++;
+                  // all posts done for this forum, increasing counter
                   if (rowsDone === rowsLength) {
                     forumsDone++;
                   }
+                  // all done, calling callback
                   if (forumsDone === forumsLength) {
                     return cb(exportedPostIds);
                   }
@@ -150,27 +182,34 @@ function makeAttachments(postIds, cb) {
     .then(dbs => {
       console.log('Attachments export starts');
       console.log('Posts with attachments:');
-      console.log(postIds);
+
       if (!postIds.length) {
         console.log('No posts with attachments');
         cb();
       }
+
       console.log('Dropping old collection.');
       dbs.mongo.collection('attachments').drop();
 
       const postIdsLength = postIds.length;
       let postIdsDone = 0;
-      postIds.forEach(pid => {
+
+      // starting one by one, to have control over memory
+      copy(0);
+
+      function copy(iteration) {
         dbs.mysql.query(
           `
           SELECT * FROM ${prefix}FILES
-          WHERE POST_ID = ${pid}
+          WHERE POST_ID = ${postIds[iteration]}
           `,
-          function(err, rows) {
+          function (err, rows) {
             if (err || !rows || !rows.length) {
-              postIdsDone++;
+              iteration++;
+              copy(iteration);
               return;
             }
+
             const rowsLength = rows.length;
             let rowsDone = 0;
             rows.forEach(row => {
@@ -178,40 +217,46 @@ function makeAttachments(postIds, cb) {
                 console.log('No  file name, skipping.');
                 return done();
               }
-              fs.readFile(attachmentsHost + row.FILE_NAME, 'base64', function (err,data) {
-                if (err){
-                  console.log('Attachments download error for postID' + pid);
+              // read file and save it to mongo as base64
+              fs.readFile(attachmentsHost + row.FILE_NAME, 'base64', function (err, data) {
+                if (err) {
+                  console.log('Attachments download error for postID' + postIds[iteration]);
                   console.log(err);
                   return done();
                 }
+
                 console.log('saving attachment:' + row.FILE_NAME);
+
                 let file = {
                   pid: row.POST_ID,
                   name: converter.toUtf8(row.FILE_NAME),
                   body: data
                 };
+
                 dbs.mongo.collection('attachments').insertOne(file);
+
                 return done();
               });
 
               function done() {
                 rowsDone++;
-
+                // all files for this posts downloaded and saved
                 if (rowsDone === rowsLength) {
                   postIdsDone++;
-                }
-
-                console.log('Progress' + parseInt(postIdsDone / postIdsLength * 100) + '%')
-
-                if (postIdsDone === postIdsLength) {
-                  cb();
+                  console.log('Progress' + parseInt(postIdsDone / postIdsLength * 100) + '%')
+                  iteration++;
+                  // all files for export done, calling callback
+                  if (!postIds[iteration]) {
+                    return cb()
+                  }
+                  // calling next iteration
+                  copy(iteration);
                 }
               }
-
             });
           }
         )
-      });
+      }
     })
     .catch(e => {
       throw e;
@@ -224,51 +269,62 @@ function makeUsers(postIds, cb) {
       console.log('Starting users');
       console.log('Dropping old collection');
       dbs.mongo.collection('users').drop();
-      const postIdsLength = postIds.length;
+
       let postIdsDone = 0;
       let usersExported = [];
-      postIds.forEach(postId => {
+      // starting one by one, to have control over memory
+      copy(0);
+
+      function copy(iteration) {
         dbs.mysql.query(
           `
           SELECT * FROM ${prefix}USERS WHERE USER_ID IN(
             SELECT 
               USER_ID 
               FROM ${prefix}POSTS
-              WHERE POST_ID = ${postId}
+              WHERE POST_ID = ${postIds[iteration]}
            )
           `,
-          function(err, rows) {
+          function (err, rows) {
             if (err) {
               throw err;
             }
-            rows.forEach(row => {
-              let alias = row.USER_DISPLAY_NAME ? row.USER_DISPLAY_NAME : row.USER_LOGIN_NAME;
-              alias = converter.toUtf8(alias);
+            // always one user for post
+            let row = rows[0];
+            // preferably user_display_name for export since this was also visible one
+            let alias = row.USER_DISPLAY_NAME ? row.USER_DISPLAY_NAME : row.USER_LOGIN_NAME;
+            alias = converter.toUtf8(alias);
 
-              if (usersExported.indexOf(row.USER_ID) > -1) {
-                console.log('User skipped ' + alias);
-                return done();
+            // check if user already saved
+            if (usersExported.indexOf(row.USER_ID) > -1) {
+              console.log('User skipped ' + alias);
+              return done();
+            }
+            usersExported.push(row.USER_ID);
+
+            let user = {
+              uid: row.USER_ID,
+              alias: alias
+            };
+
+            dbs.mongo.collection('users').insertOne(user);
+            console.log('User added ' + alias);
+
+            return done();
+
+            function done() {
+              postIdsDone++;
+              iteration++;
+              // nothing to do left, calling callback
+              if (!postIds[iteration]) {
+                return cb();
               }
-
-              usersExported.push(row.USER_ID);
-              let user = {
-                uid: row.USER_ID,
-                alias: alias
-              };
-              dbs.mongo.collection('users').insertOne(user);
-              console.log('User added ' + alias);
-
-              done();
-              function done() {
-                postIdsDone++;
-                if (postIdsDone === postIdsLength) {
-                  cb();
-                }
-              }
-            });
+              // calling next iteration
+              copy(iteration);
+            }
           }
         );
-      });
+      }
     })
     .catch(e => {
       throw e;

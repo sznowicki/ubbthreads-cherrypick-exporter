@@ -1,6 +1,6 @@
 {
   "name": "ubbthreads-cherrypick-exporter",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Exports ubbthreads topics and posts with related data to mongodb documents",
   "main": "export.js",
   "scripts": {
@@ -28,7 +28,8 @@
     "fs": "0.0.1-security",
     "lodash": "^4.16.4",
     "mongodb": "^2.2.11",
-    "mysql": "^2.11.1"
+    "mysql": "^2.11.1",
+    "node-rest-client": "^2.0.1"
   },
   "devDependencies": {
     "chai": "^3.5.0"
