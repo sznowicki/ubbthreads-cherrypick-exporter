@@ -10,5 +10,8 @@
     "prefix": "prefix for ubb forum (default is probably ubb_)",
     "realCharset": "e.x. Latin_2 (db maybe is latin1 collated, but strings could have any other larin compatible encoding. This is used for converting. If UTF-8 then no conversion is applied."
   },
-  "attachmentsPath": "{string} attachments paths on the same server"
+  "attachmentsPath": "{string} attachments paths on the same server",
+  "nodebbApiMasterToken": "(optional) Master Token for nodebb api",
+  "nodebbApiUrl": "(optional) target nodebb api url (without trailing slash)",
+  "nodebbMasterUserId": "(optional) {number} default user id (for creating categories for example, posts will be exported with original users [new or created]"
 }
