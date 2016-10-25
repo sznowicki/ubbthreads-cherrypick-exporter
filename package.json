@@ -26,10 +26,13 @@
     "app-root-path": "^2.0.1",
     "encoding": "^0.1.12",
     "fs": "0.0.1-security",
+    "jsdom": "^9.8.3",
     "lodash": "^4.16.4",
     "mongodb": "^2.2.11",
     "mysql": "^2.11.1",
-    "node-rest-client": "^2.0.1"
+    "node-rest-client": "^2.0.1",
+    "striptags": "^2.1.1",
+    "to-markdown": "^3.0.3"
   },
   "devDependencies": {
     "chai": "^3.5.0"
