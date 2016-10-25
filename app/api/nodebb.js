@@ -66,6 +66,8 @@ function createUsers(users, cb) {
         throw new Error('Could not create group');
       }
       let group = data.payload;
+      console.log(group);
+      throw new Error();
 
       users.forEach(user => {
         const nodebbUser = {
@@ -87,6 +89,9 @@ function createUsers(users, cb) {
               oldUid: user.uid
             };
             usersAdded++;
+            client.post(
+              nodebbUrl + ''
+            )
             if (usersAdded === users.length) {
               cb(newUsers);
             }

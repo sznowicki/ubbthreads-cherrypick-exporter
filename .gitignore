@@ -40,3 +40,5 @@ jspm_packages
 
 #app specific
 config.json
+!attachments/.gitkeep
+attachments

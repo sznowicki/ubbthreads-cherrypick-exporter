@@ -6,7 +6,6 @@ const allDbs = require('./db/all-dbs');
 const converter = require('./helpers/converter');
 const prefix = config.getSetting('mysql.prefix');
 const fs = require('fs');
-const attachmentsHost = config.getSetting('attachmentsPath');
 
 /**
  * Reads ubb forums and saves all
@@ -108,9 +107,9 @@ function makeForumsTopics(forums, cb) {
           LIMIT 0, 99999999999
          `,
           function (err, rows) {
-            const rowsLength = rows.length;
-            let rowsDone = 0;
-            rows.forEach((row) => {
+            copy(0);
+            function copy(iteration) {
+              let row = rows[iteration];
               dbs.mysql.query(
                 `
                 SELECT * 
@@ -156,25 +155,28 @@ function makeForumsTopics(forums, cb) {
                   console.log('Topic postID: ' + topic.postId);
 
                   dbs.mongo.collection('topics').insertOne(topic);
-                  rowsDone++;
-                  // all posts done for this forum, increasing counter
-                  if (rowsDone === rowsLength) {
+                  iteration++;
+
+                  if (!rows[iteration]) {
                     forumsDone++;
+                    // all done, calling callback
+                    if (forumsDone === forumsLength) {
+                      return cb(exportedPostIds);
+                    }
+                    return;
                   }
-                  // all done, calling callback
-                  if (forumsDone === forumsLength) {
-                    return cb(exportedPostIds);
-                  }
+                  return copy(iteration);
                 }
               )
-            });
+            }
           }
         )
       });
     })
     .catch(e => {
+      console.log(e);
       throw e;
-    })
+    });
 }
 
 function makeAttachments(postIds, cb) {
@@ -195,7 +197,7 @@ function makeAttachments(postIds, cb) {
       let postIdsDone = 0;
 
       // starting one by one, to have control over memory
-      copy(0);
+      return copy(0);
 
       function copy(iteration) {
         dbs.mysql.query(
@@ -206,56 +208,37 @@ function makeAttachments(postIds, cb) {
           function (err, rows) {
             if (err || !rows || !rows.length) {
               iteration++;
-              copy(iteration);
-              return;
+              console.log(err);
+              return done();
             }
 
-            const rowsLength = rows.length;
-            let rowsDone = 0;
-            rows.forEach(row => {
+            rows.forEach((row, i) => {
               if (!row.FILE_NAME) {
                 console.log('No  file name, skipping.');
                 return done();
               }
-              // read file and save it to mongo as base64
-              fs.readFile(attachmentsHost + row.FILE_NAME, 'base64', function (err, data) {
-                if (err) {
-                  console.log('Attachments download error for postID' + postIds[iteration]);
-                  console.log(err);
-                  return done();
-                }
+              let file = {
+                pid: row.POST_ID,
+                name: converter.toUtf8(row.FILE_NAME),
+              };
+              dbs.mongo.collection('attachments').insertOne(file);
 
-                console.log('saving attachment:' + row.FILE_NAME);
-
-                let file = {
-                  pid: row.POST_ID,
-                  name: converter.toUtf8(row.FILE_NAME),
-                  body: data
-                };
-
-                dbs.mongo.collection('attachments').insertOne(file);
-
-                return done();
-              });
-
-              function done() {
-                rowsDone++;
-                // all files for this posts downloaded and saved
-                if (rowsDone === rowsLength) {
-                  postIdsDone++;
-                  console.log('Progress' + parseInt(postIdsDone / postIdsLength * 100) + '%')
-                  iteration++;
-                  // all files for export done, calling callback
-                  if (!postIds[iteration]) {
-                    return cb()
-                  }
-                  // calling next iteration
-                  copy(iteration);
-                }
-              }
             });
-          }
-        )
+            postIdsDone++;
+
+            return done();
+
+            function done() {
+              console.log('Progress' + parseInt(postIdsDone / postIdsLength * 100) + '%');
+              iteration++;
+              // all files for export done, calling callback
+              if (!postIds[iteration]) {
+                return cb()
+              }
+              // calling next iteration
+              copy(iteration);
+            }
+          });
       }
     })
     .catch(e => {
