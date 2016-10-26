@@ -207,27 +207,31 @@ function makeAttachments(postIds, cb) {
           `,
           function (err, rows) {
             if (err || !rows || !rows.length) {
-              iteration++;
-              console.log(err);
+              console.log('No files for this post. ' + postIds[iteration]);
               return done();
             }
 
+            let rowsDone = 0;
             rows.forEach((row, i) => {
               if (!row.FILE_NAME) {
                 console.log('No  file name, skipping.');
-                return done();
+                return;
               }
               let file = {
                 pid: row.POST_ID,
                 name: converter.toUtf8(row.FILE_NAME),
+                type: row.FILE_TYPE
               };
-              dbs.mongo.collection('attachments').insertOne(file);
+              dbs.mongo.collection('attachments').insertOne(file, function(err, result){
+                rowsDone++;
+                if (rowsDone === rows.length) {
+                  return done();
+                }
+              });
             });
-            postIdsDone++;
-
-            return done();
 
             function done() {
+              postIdsDone++;
               console.log('Progress' + parseInt(postIdsDone / postIdsLength * 100) + '%');
               iteration++;
               // all files for export done, calling callback
@@ -235,7 +239,7 @@ function makeAttachments(postIds, cb) {
                 return cb()
               }
               // calling next iteration
-              copy(iteration);
+              return copy(iteration);
             }
           });
       }
