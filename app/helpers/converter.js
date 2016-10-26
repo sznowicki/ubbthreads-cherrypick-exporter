@@ -42,7 +42,10 @@ function ubbContentToNodebb(string, data, cb) {
       let $ = window.$;
       $('img').each(function() {
         let $img = $(this);
-        if ($img.attr('src').indexOf('GRAEMLIN_URL') > -1) {
+        if (
+            $img.attr('src').indexOf('GRAEMLIN_URL') > -1
+            || $img.attr('src').indexOf('graemlins') > -1
+        ) {
           $img.remove();
           return;
         }
