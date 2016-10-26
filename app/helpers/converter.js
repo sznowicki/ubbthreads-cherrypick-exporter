@@ -6,6 +6,8 @@ const fromCharset = config.getSetting('mysql.realCharset');
 const toMarkdown = require('to-markdown');
 const stripTags = require('striptags');
 const jsdom = require('jsdom');
+const urlParse = require('url-parse');
+const queryString = require('query-string');
 
 /**
  * Converts ugly encoding given in config to utf-8
@@ -30,7 +32,8 @@ function toMD(string) {
  *
  * @param string
  */
-function ubbContentToNodebb(string, cb) {
+function ubbContentToNodebb(string, data, cb) {
+
   let content = string;
   jsdom.env(
     content,
@@ -44,11 +47,33 @@ function ubbContentToNodebb(string, cb) {
           return;
         }
       });
-      console.log(string);
+      $('a').each(function(){
+        let $el = $(this);
+        let href = $el.attr('href');
+        let parsed = urlParse(href);
+        if (parsed.query) {
+          let parsedQuery = queryString.parse(parsed.query);
+          if (parsedQuery.Number && data.postsMapping[parsedQuery.Number]) {
+            let pid = data.postsMapping[parsedQuery.Number];
+            href = `/post/${pid}`;
+          }
+        }
+        $el.attr('href', href);
+      });
+      data.files.forEach(file => {
+        let $el;
+        let src = `//files.zlosniki.pl/${file.name}`;
+
+        if (['jpg', 'jpeg', 'png', 'gif', 'bmp'].indexOf(file.type) > -1) {
+          $el = $(`<img src="${src}" class="attachment-img">`);
+        } else {
+          $el = $(`<a href="${src}" class="attachment-file">`);
+        }
+        $('body').append($el);
+      });
       content = $('body').html();
       content = toMarkdown(content);
       content = stripTags(content, '<br><a><img><p>');
-      console.log(content);
       return cb(content);
     }
   );

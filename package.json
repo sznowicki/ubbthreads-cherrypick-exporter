@@ -31,8 +31,10 @@
     "mongodb": "^2.2.11",
     "mysql": "^2.11.1",
     "node-rest-client": "^2.0.1",
+    "query-string": "^4.2.3",
     "striptags": "^2.1.1",
-    "to-markdown": "^3.0.3"
+    "to-markdown": "^3.0.3",
+    "url-parse": "^1.1.6"
   },
   "devDependencies": {
     "chai": "^3.5.0"
