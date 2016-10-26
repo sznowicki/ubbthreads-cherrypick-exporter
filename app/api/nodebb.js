@@ -160,7 +160,6 @@ function createPost(postData, topicId, cb) {
     data.cid = postData.cid;
     data.title =  postData.title;
   }
-
   client.post(
     nodebbApiUrl + path,
     {
@@ -168,18 +167,41 @@ function createPost(postData, topicId, cb) {
       data: data,
     },
     function (data) {
-      console.log(nodebbApiUrl + path);
-      console.log(data);
       if (data.code !== 'ok') {
+        console.log(data);
         throw new Error('Could not create post: ' + postData.title);
+      }
+      if (topicId) {
+        console.log(data);
       }
       cb(data.payload);
     }
   );
 }
 
+function updatePost(pid, _uid, content) {
+  console.log('/posts/' + pid);
+
+  client.put(
+    nodebbApiUrl + '/posts/' + pid,
+    {
+      headers: defaultHeaders,
+      data: {
+        content,
+        _uid
+      }
+    },
+    function(data) {
+      if (data.code !== 'ok') {
+        throw new Error('Could not update post: ' + pid);
+      }
+    }
+  )
+}
+
 module.exports = {
   createCategories,
   createUsers,
-  createPost
+  createPost,
+  updatePost,
 };

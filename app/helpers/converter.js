@@ -4,7 +4,8 @@ const encoding = require('encoding');
 const config = require('../helpers/config');
 const fromCharset = config.getSetting('mysql.realCharset');
 const toMarkdown = require('to-markdown');
-const stripTags = require('striptags')
+const stripTags = require('striptags');
+const jsdom = require('jsdom');
 
 /**
  * Converts ugly encoding given in config to utf-8
@@ -29,12 +30,28 @@ function toMD(string) {
  *
  * @param string
  */
-function ubbContentToNodebb(string) {
+function ubbContentToNodebb(string, cb) {
   let content = string;
-  content = toMarkdown(string);
-  content = stripTags(content, '<br><a><img><p>');
-
-  return content;
+  jsdom.env(
+    content,
+    ["http://code.jquery.com/jquery.js"],
+    function(err, window) {
+      let $ = window.$;
+      $('img').each(function() {
+        let $img = $(this);
+        if ($img.attr('src').indexOf('GRAEMLIN_URL') > -1) {
+          $img.remove();
+          return;
+        }
+      });
+      console.log(string);
+      content = $('body').html();
+      content = toMarkdown(content);
+      content = stripTags(content, '<br><a><img><p>');
+      console.log(content);
+      return cb(content);
+    }
+  );
 }
 
 module.exports = {

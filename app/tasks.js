@@ -222,7 +222,6 @@ function makeAttachments(postIds, cb) {
                 name: converter.toUtf8(row.FILE_NAME),
               };
               dbs.mongo.collection('attachments').insertOne(file);
-
             });
             postIdsDone++;
 

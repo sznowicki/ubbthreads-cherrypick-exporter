@@ -4,10 +4,12 @@ const tasks = require('./app/nodebb-tasks');
 tasks.makeUsers((newUsers) => {
   console.log(newUsers);
   tasks.makeCategories((newCategories) => {
-    console.log(newUsers);
-    console.log(newCategories);
-    tasks.makeThreads(newUsers, newCategories, () => {
-      process.exit();
+    tasks.makeThreads(newUsers, newCategories, (postsMapping) => {
+      console.log('result');
+      console.log(postsMapping);
+      tasks.convertContents(newUsers, postsMapping, () => {
+        process.exit();
+      });
     });
   });
 });
