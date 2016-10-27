@@ -52,6 +52,7 @@ function createCategories(forums, cb) {
 
 function createUsers(users, cb) {
   const newUsers = {};
+  const usersLength = users.length;
   let usersAdded = 0;
   return client.post(
     nodebbApiUrl + '/groups',
@@ -69,80 +70,94 @@ function createUsers(users, cb) {
       let group = data.payload;
       let groupSlug = group.slug;
 
-      users.forEach((user, i) => {
+      return copyUser(0);
+
+      function copyUser(i) {
+        console.log(process.memoryUsage());
+        const user = users[i];
         const nodebbUser = {
           _uid: nodebbMasterUser,
           username: user.alias.replace(/\W/g, '')
         };
-        setTimeout(function () {
-          client.get(
-            nodebbUrl + '/user/' + nodebbUser.username.toLowerCase(),
-            function (data, res) {
-              const statusCode = res.statusCode;
-              if (statusCode !== 200) {
-                return client.post(
-                  nodebbApiUrl + '/users',
-                  {
-                    headers: defaultHeaders,
-                    data: nodebbUser
-                  },
-                  function (data) {
-                    if (data.code !== 'ok') {
-                      throw new Error('Could not create user: ' + nodebbUser.username);
-                    }
-                    newUsers[user.uid] = {
-                      uid: data.payload.uid,
-                      oldUid: user.uid
-                    };
-                    client.post(
-                      nodebbApiUrl + `/groups/${groupSlug}/membership`,
-                      {
-                        headers: defaultHeaders,
-                        data: {
-                          _uid: newUsers[user.uid].uid
-                        }
-                      },
-                      function (data, res) {
-                        if (data.code !== 'ok') {
-                          throw new Error('User could not join the group: ' + nodebbUser.username);
-                        }
-                        usersAdded++;
-                        if (usersAdded === users.length) {
-                          cb(newUsers);
-                        }
-                      }
-                    )
-                  }
-                )
-              } else {
-                const body = data.toString();
-                jsdom.env(
-                  body,
-                  ["http://code.jquery.com/jquery.js"],
-                  function (err, window) {
-                    if (err) {
-                      throw err;
-                    }
-                    const uid = window.$('[data-uid]').data('uid');
-                    if (!uid) {
-                      throw new Error('No uid found for user');
-                    }
-                    newUsers[user.uid] = {
-                      uid: uid,
-                      oldUid: user.uid,
-                    };
-                    usersAdded++;
-                    if (usersAdded === users.length) {
-                      cb(newUsers);
-                    }
-                  }
-                );
-
+        client.get(
+          nodebbUrl + '/user/' + nodebbUser.username.toLowerCase(),
+          function (data, res) {
+            const statusCode = res.statusCode;
+            if (statusCode !== 200) {
+              let username = nodebbUser.username;
+              if (!username || username.length < 3) {
+                nodebbUser.username = nodebbUser.username + new Date().getTime();
               }
+              return client.post(
+                nodebbApiUrl + '/users',
+                {
+                  headers: defaultHeaders,
+                  data: nodebbUser
+                },
+                function (data) {
+                  if (data.code !== 'ok') {
+                    console.log(nodebbUser);
+                    console.log(data);
+                    throw new Error('Could not create user: ' + nodebbUser.username);
+                  }
+                  newUsers[user.uid] = {
+                    uid: data.payload.uid,
+                    oldUid: user.uid
+                  };
+                  client.post(
+                    nodebbApiUrl + `/groups/${groupSlug}/membership`,
+                    {
+                      headers: defaultHeaders,
+                      data: {
+                        _uid: newUsers[user.uid].uid
+                      }
+                    },
+                    function (data, res) {
+                      if (data.code !== 'ok') {
+                        throw new Error('User could not join the group: ' + nodebbUser.username);
+                      }
+                      usersAdded++;
+                      console.log('User created, progress: ' + Math.round((usersAdded / usersLength) * 100) + '%');
+                      return done();
+                    }
+                  )
+                }
+              )
+            } else {
+              const body = data.toString();
+              jsdom.env(
+                body,
+                ["http://code.jquery.com/jquery.js"],
+                function (err, window) {
+                  if (err) {
+                    throw err;
+                  }
+                  const uid = window.$('[data-uid]').data('uid');
+                  if (!uid) {
+                    throw new Error('No uid found for user');
+                  }
+                  newUsers[user.uid] = {
+                    uid: uid,
+                    oldUid: user.uid,
+                  };
+                  usersAdded++;
+                  console.log('User skipped, progress: ' + Math.round((usersAdded / usersLength) * 100) + '%');
+
+                  return done();
+                }
+              );
+
             }
-          );
-        }, i * 100);
-      });
+          }
+        );
+        function done() {
+          i++;
+          if (!users[i]) {
+            return cb(newUsers);
+          }
+          copyUser(i);
+        }
+      }
     }
   );
 }

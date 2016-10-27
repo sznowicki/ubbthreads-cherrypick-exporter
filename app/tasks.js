@@ -96,7 +96,7 @@ function makeForumsTopics(forums, cb) {
       const forumsLength = forums.length;
       let forumsDone = 0;
       /*
-       * This is fast, no need for memory menagement, can go async.
+       * This is fast, no need for memory management, can go async.
        */
       forums.forEach(forumId => {
         dbs.mysql.query(
