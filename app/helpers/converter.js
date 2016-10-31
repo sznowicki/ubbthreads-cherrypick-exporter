@@ -38,28 +38,34 @@ function ubbContentToNodebb(string, data, cb) {
   jsdom.env(
     content,
     ["http://code.jquery.com/jquery.js"],
-    function(err, window) {
+    function (err, window) {
       let $ = window.$;
-      $('img').each(function() {
+      $('img').each(function () {
         let $img = $(this);
         if (
-            $img.attr('src').indexOf('GRAEMLIN_URL') > -1
-            || $img.attr('src').indexOf('graemlins') > -1
+          $img.attr('src').indexOf('GRAEMLIN_URL') > -1
+          || $img.attr('src').indexOf('graemlins') > -1
         ) {
           $img.remove();
           return;
         }
       });
-      $('a').each(function(){
+      $('a').each(function () {
         let $el = $(this);
         let href = $el.attr('href');
-        let parsed = urlParse(href);
-        if (parsed.query) {
-          let parsedQuery = queryString.parse(parsed.query);
-          if (parsedQuery.Number && data.postsMapping[parsedQuery.Number]) {
-            let pid = data.postsMapping[parsedQuery.Number];
-            href = `/post/${pid}`;
+        try {
+          let parsed = urlParse(href);
+          if (parsed.query) {
+            let parsedQuery = queryString.parse(parsed.query);
+
+            if (parsedQuery.Number && data.postsMapping[parsedQuery.Number]) {
+              let pid = data.postsMapping[parsedQuery.Number];
+              href = `/post/${pid}`;
+            }
           }
+        } catch (e) {
+          console.log('Invalid link. Skipping: ' + href);
+
         }
         $el.attr('href', href);
       });
