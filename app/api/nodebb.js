@@ -60,7 +60,8 @@ function createUsers(users, cb) {
       headers: defaultHeaders,
       data: {
         _uid: nodebbMasterUser,
-        name: 'Imported users ' + new Date().toString()
+        name: 'Imported users ' + new Date().toString(),
+        private: false
       }
     },
     function (data) {
@@ -187,7 +188,7 @@ function createPost(postData, topicId, cb) {
         throw new Error('Could not create post: ' + postData.title);
       }
       if (topicId) {
-        console.log(data);
+        console.log(data.payload.topic.title);
       }
       cb(data.payload);
     }

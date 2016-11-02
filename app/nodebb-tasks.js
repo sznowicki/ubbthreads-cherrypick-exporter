@@ -44,6 +44,7 @@ function makeThreads(newUsers, newCategories, cb) {
 
         sendTopic(0);
         function sendTopic(iteration) {
+          console.log('\x1b[34m', `Iteration ${iteration} / ${topics.length}`, '\x1b[0m');
           const topicData = topics[iteration];
 
           let topic = {
@@ -112,6 +113,7 @@ function convertContents(newUsers, postsMapping, cb) {
       dbs.mongo.collection('topics').find({}).toArray((err, topics) => {
         convertTopic(0);
         function convertTopic(iteration) {
+          console.log('\x1b[36m', `Iteration ${iteration} / ${topics.length}`, '\x1b[0m');
           let topic = topics[iteration];
           let uid = newUsers[topic.uid].uid;
           let pid = postsMapping[topic.postId];
@@ -135,7 +137,7 @@ function convertContents(newUsers, postsMapping, cb) {
                       return cb();
                     }
                     return convertTopic(iteration);
-                  }, 100);
+                  }, 50);
                 }
                 function convertReply(i) {
                   let reply = topic.replies[i];
