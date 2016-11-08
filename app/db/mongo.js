@@ -17,6 +17,7 @@ const Mongo = function() {
           if (err) {
             return reject(err);
           }
+          connection = db;
           return resolve(db);
         }
       );

@@ -16,7 +16,7 @@ const defaultHeaders = {
 };
 
 function createCategories(forums, cb) {
-  const nodebbForums = {};
+  const nodebbForums = [];
   let forumsAdded = 0;
 
   forums.forEach(forum => {
@@ -41,7 +41,7 @@ function createCategories(forums, cb) {
 
         data.payload.FORUM_ID = forum.FORUM_ID;
 
-        nodebbForums[data.payload.FORUM_ID] = data.payload;
+        nodebbForums.push(data.payload);
         forumsAdded++;
         if (forumsAdded === forums.length) {
           cb(nodebbForums);
@@ -50,8 +50,8 @@ function createCategories(forums, cb) {
   });
 }
 
-function createUsers(users, cb) {
-  const newUsers = {};
+function createUsers(dbs, users, cb) {
+  const newUsers = [];
   const usersLength = users.length;
   let usersAdded = 0;
   return client.post(
@@ -66,6 +66,7 @@ function createUsers(users, cb) {
     },
     function (data) {
       if (data.code !== 'ok') {
+        console.error(data);
         throw new Error('Could not create group');
       }
       let group = data.payload;
@@ -74,7 +75,6 @@ function createUsers(users, cb) {
       return copyUser(0);
 
       function copyUser(i) {
-        console.log(process.memoryUsage());
         const user = users[i];
         const nodebbUser = {
           _uid: nodebbMasterUser,
@@ -101,25 +101,26 @@ function createUsers(users, cb) {
                     console.log(data);
                     throw new Error('Could not create user: ' + nodebbUser.username);
                   }
-                  newUsers[user.uid] = {
+                  newUsers.push({
                     uid: data.payload.uid,
                     oldUid: user.uid
-                  };
+                  });
                   client.post(
                     nodebbApiUrl + `/groups/${groupSlug}/membership`,
                     {
                       headers: defaultHeaders,
                       data: {
-                        _uid: newUsers[user.uid].uid
+                        _uid: data.payload.uid
                       }
                     },
-                    function (data, res) {
-                      if (data.code !== 'ok') {
+                    function (postData, res) {
+                      if (postData.code !== 'ok') {
                         throw new Error('User could not join the group: ' + nodebbUser.username);
                       }
                       usersAdded++;
                       console.log('User created, progress: ' + Math.round((usersAdded / usersLength) * 100) + '%');
-                      return done();
+                      return updateUser(user.uid, data.payload.uid);
+
                     }
                   )
                 }
@@ -137,14 +138,14 @@ function createUsers(users, cb) {
                   if (!uid) {
                     throw new Error('No uid found for user');
                   }
-                  newUsers[user.uid] = {
+                  newUsers.push({
                     uid: uid,
                     oldUid: user.uid,
-                  };
+                  });
+
                   usersAdded++;
                   console.log('User skipped, progress: ' + Math.round((usersAdded / usersLength) * 100) + '%');
-
-                  return done();
+                  return updateUser(user.uid, uid);
                 }
               );
 
@@ -158,6 +159,30 @@ function createUsers(users, cb) {
           }
           copyUser(i);
         }
+
+        function updateUser(oldUid, bbUid) {
+          if (!oldUid) {
+            throw new Error('No old uid provided');
+          }
+          dbs.mongo.collection('users').updateOne(
+            {
+              uid: oldUid
+            },
+            {
+              $set: {
+                bbUid: bbUid
+              }
+            },
+            function(err, result) {
+              if (err) {
+                console.error(err);
+                throw new Error('Update user failed for ' . newUser.oldUid);
+              }
+
+              return done();
+            }
+          )
+        }
       }
     }
   );
@@ -168,6 +193,7 @@ function createPost(postData, topicId, cb) {
   let data = {
     content: postData.content,
     _uid: postData._uid,
+    timestamp: postData.timestamp,
   };
 
   if (topicId) {
@@ -196,23 +222,26 @@ function createPost(postData, topicId, cb) {
 }
 
 function updatePost(pid, _uid, content) {
-  console.log('/posts/' + pid);
-
-  client.put(
-    nodebbApiUrl + '/posts/' + pid,
-    {
-      headers: defaultHeaders,
-      data: {
-        content,
-        _uid
+  return new Promise((resolve, reject) => {
+    client.put(
+      nodebbApiUrl + '/posts/' + pid,
+      {
+        headers: defaultHeaders,
+        data: {
+          content,
+          _uid
+        }
+      },
+      function(data) {
+        console.log('Post updated');
+        if (data.code !== 'ok') {
+          console.log('reject');
+          return reject(data)
+        }
+        return resolve();
       }
-    },
-    function(data) {
-      if (data.code !== 'ok') {
-        throw new Error('Could not update post: ' + pid);
-      }
-    }
-  )
+    )
+  });
 }
 
 module.exports = {
