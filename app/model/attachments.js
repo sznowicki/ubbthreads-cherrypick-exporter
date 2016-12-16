@@ -5,7 +5,6 @@ function getAttachments(postId) {
   return new Promise((resolve, reject) => {
     dbs.getAllDbs()
       .then(dbs => {
-        console.log(postId);
         dbs.mongo.collection('attachments').find({pid: postId}).toArray((err, rows) => {
           if (err) {
             return reject(err);

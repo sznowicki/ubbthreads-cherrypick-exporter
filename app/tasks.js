@@ -101,7 +101,7 @@ function makeForumsTopics(forums, cb) {
       forums.forEach(forumId => {
         dbs.mysql.query(
           `
-          SELECT POST_ID
+          SELECT TOPIC_ID
           FROM ${prefix}TOPICS 
           WHERE FORUM_ID = ${forumId}
           LIMIT 0, 99999999999
@@ -114,12 +114,12 @@ function makeForumsTopics(forums, cb) {
                 `
                 SELECT * 
                 FROM ${prefix}POSTS
-                WHERE POST_ID = ${row.POST_ID}
-                OR POST_PARENT_ID = ${row.POST_ID}
+                WHERE TOPIC_ID = ${row.TOPIC_ID}
                 ORDER BY POST_POSTED_TIME ASC
                 LIMIT 0, 99999999999
                 `,
                 function (err, posts) {
+
                   let topic = {
                     uid: null,
                     fid: forumId,
